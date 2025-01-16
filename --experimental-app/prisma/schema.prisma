@@ -1,0 +1,17 @@
+// prisma/schema.prisma
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Thrips {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  tea       Int
+  other     Int
+}
