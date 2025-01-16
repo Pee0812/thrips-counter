@@ -12,7 +12,14 @@ import {
 } from "chart.js"
 import { Line } from "react-chartjs-2"
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Legend
+)
 
 // 日単位レスポンスの型
 type DayData = {
@@ -39,6 +46,7 @@ export default function ThripsChart() {
   const [period, setPeriod] = useState<"day" | "week" | "month">("day")
   const [dataList, setDataList] = useState<DayData[] | WeekData[] | MonthData[]>([])
 
+  // データ取得
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -55,61 +63,13 @@ export default function ThripsChart() {
     fetchData()
   }, [period])
 
-  // ★ CSV出力ボタン押下時の処理
-  const handleCsvExport = () => {
-    if (!dataList.length) {
-      alert("データがありません。")
-      return
-    }
-
-    let csvHeader = ""
-    let csvRows: string[] = []
-
-    // 期間に応じてヘッダーと行を作る
-    if (period === "day") {
-      // dayData[] を想定
-      csvHeader = "date,sumTea,sumOther"
-      const dayData = dataList as DayData[]
-      csvRows = dayData.map((item) => {
-        return `${item.date},${item.sumTea},${item.sumOther}`
-      })
-    } else if (period === "week") {
-      // weekData[] を想定
-      csvHeader = "yearWeek,sumTea,sumOther"
-      const weekData = dataList as WeekData[]
-      csvRows = weekData.map((item) => {
-        return `${item.yearWeek},${item.sumTea},${item.sumOther}`
-      })
-    } else {
-      // monthData[] を想定
-      csvHeader = "yearMonth,sumTea,sumOther"
-      const monthData = dataList as MonthData[]
-      csvRows = monthData.map((item) => {
-        return `${item.yearMonth},${item.sumTea},${item.sumOther}`
-      })
-    }
-
-    // CSV文字列を生成
-    const csvContent = csvHeader + "\n" + csvRows.join("\n")
-
-    // Blobを作成してダウンロードリンク生成
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    link.href = url
-    // ファイル名を好きに設定
-    link.setAttribute("download", `thrips-${period}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
-
+  // 期間セレクト
   const handlePeriodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value as "day" | "week" | "month"
     setPeriod(value)
   }
 
-  // ---- グラフ用に labels / datasets を組み立て ----
+  // グラフ用データ生成
   let labels: string[] = []
   let teaValues: number[] = []
   let otherValues: number[] = []
@@ -139,6 +99,7 @@ export default function ThripsChart() {
     }
   }
 
+  // Chart.js に渡すデータ
   const data = {
     labels,
     datasets: [
@@ -161,6 +122,7 @@ export default function ThripsChart() {
     ],
   }
 
+  // オプション (ticks.callback の型修正)
   const options = {
     responsive: true,
     scales: {
@@ -168,8 +130,13 @@ export default function ThripsChart() {
         beginAtZero: true,
         ticks: {
           stepSize: 1,
-          callback: function (value: number) {
-            return String(value)
+          callback: function (tickValue: string | number) {
+            // tickValue が number なら文字列化
+            if (typeof tickValue === "number") {
+              return tickValue.toString()
+            }
+            // それ以外 (string) はそのまま返す or 必要に応じて変換
+            return tickValue
           },
         },
       },
@@ -180,11 +147,16 @@ export default function ThripsChart() {
     <div className="min-h-screen bg-gray-50 text-gray-800">
       <div className="max-w-3xl mx-auto px-4 py-10">
         {/* タイトル */}
-        <h1 className="text-3xl font-bold text-center mb-8">アザミウマ記録グラフ</h1>
+        <h1 className="text-3xl font-bold text-center mb-8">
+          アザミウマ記録グラフ
+        </h1>
 
-        {/* 期間セレクト */}
+        {/* 期間セレクタ */}
         <div className="flex justify-center items-center gap-4 mb-8">
-          <label htmlFor="periodSelect" className="text-base font-medium text-gray-700">
+          <label
+            htmlFor="periodSelect"
+            className="text-base font-medium text-gray-700"
+          >
             集計期間
           </label>
           <select
@@ -197,17 +169,9 @@ export default function ThripsChart() {
             <option value="week">週</option>
             <option value="month">月</option>
           </select>
-
-          {/* CSV出力ボタン */}
-          <button
-            onClick={handleCsvExport}
-            className="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded-md"
-          >
-            CSV出力
-          </button>
         </div>
 
-        {/* グラフ部分 */}
+        {/* グラフをカード風に */}
         <div className="bg-white shadow-sm rounded-lg p-6">
           <Line data={data} options={options} />
         </div>
