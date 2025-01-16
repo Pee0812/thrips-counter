@@ -69,3 +69,29 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }
+
+export async function POST(req: NextRequest) {
+  try {
+    // リクエストボディを取得
+    const body = await req.json();
+
+    // データのバリデーション（必要なら追加）
+    if (!body.tea || !body.other) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    // Prisma を使用してデータベースに保存
+    const newThrips = await prisma.thrips.create({
+      data: {
+        tea: body.tea,
+        other: body.other,
+      },
+    });
+
+    // 成功時のレスポンス
+    return NextResponse.json({ message: 'Data saved successfully', data: newThrips }, { status: 201 });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
+}
