@@ -1,22 +1,29 @@
 // src/app/api/thrips/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { createClient } from '@supabase/supabase-js'
 import { format, startOfWeek, startOfMonth } from 'date-fns'
 
-const prisma = new PrismaClient()
+// Supabaseクライアントの初期化
+const supabaseUrl = process.env.SUPABASE_URL || ''
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const period = searchParams.get('period') || 'day'
 
-    const allThrips = await prisma.thrips.findMany({
-      orderBy: { createdAt: 'asc' },
-    })
+    // Supabaseからデータを取得
+    const { data: allThrips, error } = await supabase
+      .from('thrips')
+      .select('*')
+      .order('createdAt', { ascending: true })  // カラム名はテーブル定義に合わせる
+    if (error) throw error
 
     const grouped: Record<string, { tea: number; other: number }> = {}
 
-    for (const row of allThrips) {
+    for (const row of allThrips || []) {
+      // Supabaseでは通常、タイムスタンプフィールドは snake_case のため 'createdAt' を使用
       const dateObj = new Date(row.createdAt)
       let key = ''
 
@@ -40,7 +47,6 @@ export async function GET(req: NextRequest) {
 
     const sortedKeys = Object.keys(grouped).sort()
 
-    // ★ period別に返すキー名を変更
     const result = sortedKeys.map((k) => {
       if (period === 'week') {
         return {
@@ -72,26 +78,22 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    // リクエストボディを取得
-    const body = await req.json();
+    const body = await req.json()
 
-    // データのバリデーション（必要なら追加）
-    if (!body.tea || !body.other) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    if (body.tea === undefined || body.other === undefined) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // Prisma を使用してデータベースに保存
-    const newThrips = await prisma.thrips.create({
-      data: {
-        tea: body.tea,
-        other: body.other,
-      },
-    });
+    // Supabaseを使ってデータを挿入
+    const { data: newThrips, error } = await supabase
+      .from('thrips')
+      .insert({ tea: body.tea, other: body.other })
+      .select()  // 挿入したデータを返す場合
+    if (error) throw error
 
-    // 成功時のレスポンス
-    return NextResponse.json({ message: 'Data saved successfully', data: newThrips }, { status: 201 });
+    return NextResponse.json({ message: 'Data saved successfully', data: newThrips }, { status: 201 })
   } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error(err)
+    return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }

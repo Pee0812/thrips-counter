@@ -69,6 +69,43 @@ export default function ThripsChart() {
     setPeriod(value)
   }
 
+  // CSVエクスポート用の関数
+  const exportCSV = () => {
+    let csvContent = '';
+    let headers = '';
+
+    if (period === "day") {
+      headers = 'date,sumTea,sumOther';
+    } else if (period === "week") {
+      headers = 'yearWeek,sumTea,sumOther';
+    } else {
+      headers = 'yearMonth,sumTea,sumOther';
+    }
+    csvContent += headers + '\n';
+
+    dataList.forEach(item => {
+      if (period === "day") {
+        const row = item as DayData;
+        csvContent += `${row.date},${row.sumTea},${row.sumOther}\n`;
+      } else if (period === "week") {
+        const row = item as WeekData;
+        csvContent += `${row.yearWeek},${row.sumTea},${row.sumOther}\n`;
+      } else {
+        const row = item as MonthData;
+        csvContent += `${row.yearMonth},${row.sumTea},${row.sumOther}\n`;
+      }
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `thrips_${period}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // グラフ用データ生成
   let labels: string[] = []
   let teaValues: number[] = []
@@ -99,12 +136,11 @@ export default function ThripsChart() {
     }
   }
 
-  // Chart.js に渡すデータ
   const data = {
     labels,
     datasets: [
       {
-        label: "Tea(チャノキイロ)",
+        label: "チャノキイロ",
         data: teaValues,
         borderColor: "rgba(75, 192, 192, 0.9)",
         backgroundColor: "rgba(75, 192, 192, 0.2)",
@@ -112,7 +148,7 @@ export default function ThripsChart() {
         fill: true,
       },
       {
-        label: "Other(別種)",
+        label: "別種",
         data: otherValues,
         borderColor: "rgba(255, 99, 132, 0.9)",
         backgroundColor: "rgba(255, 99, 132, 0.2)",
@@ -122,21 +158,26 @@ export default function ThripsChart() {
     ],
   }
 
-  // オプション (ticks.callback の型修正)
+  // 縦軸の目盛りを見やすく設定するための計算
+  const allValues = [...teaValues, ...otherValues];
+  const maxY = allValues.length ? Math.max(...allValues) : 0;
+  const adjustedMax = Math.ceil(maxY / 10) * 10;  // 最大値を10の倍数に調整
+
   const options = {
     responsive: true,
+    maintainAspectRatio: false,
     scales: {
       y: {
         beginAtZero: true,
         ticks: {
-          stepSize: 1,
+          stepSize: 10,            // 10刻みで設定
+          max: adjustedMax,        // 調整した最大値
+          precision: 0,            // 整数表示を強制
           callback: function (tickValue: string | number) {
-            // tickValue が number なら文字列化
             if (typeof tickValue === "number") {
-              return tickValue.toString()
+              return tickValue.toString();
             }
-            // それ以外 (string) はそのまま返す or 必要に応じて変換
-            return tickValue
+            return tickValue;
           },
         },
       },
@@ -151,7 +192,7 @@ export default function ThripsChart() {
           アザミウマ記録グラフ
         </h1>
 
-        {/* 期間セレクタ */}
+        {/* 期間セレクタとCSVエクスポートボタン */}
         <div className="flex justify-center items-center gap-4 mb-8">
           <label
             htmlFor="periodSelect"
@@ -169,10 +210,17 @@ export default function ThripsChart() {
             <option value="week">週</option>
             <option value="month">月</option>
           </select>
+
+          <button
+            onClick={exportCSV}
+            className="ml-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none"
+          >
+            CSVエクスポート
+          </button>
         </div>
 
         {/* グラフをカード風に */}
-        <div className="bg-white shadow-sm rounded-lg p-6">
+        <div className="bg-white shadow-sm rounded-lg p-6" style={{ height: '500px' }}>
           <Line data={data} options={options} />
         </div>
       </div>
