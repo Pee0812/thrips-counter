@@ -9,33 +9,46 @@ import {
   LineElement,
   Tooltip,
   Legend,
+  ArcElement,
 } from "chart.js"
-import { Line } from "react-chartjs-2"
+import { Line, Pie } from "react-chartjs-2"
+import { Loader2 } from "lucide-react"
+
+// chadcnUI コンポーネントのインポート
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
+  ArcElement,
   Tooltip,
   Legend
 )
 
-// 日単位レスポンスの型
+// データ型の定義
 type DayData = {
   date: string
   sumTea: number
   sumOther: number
 }
 
-// 週単位レスポンスの型
 type WeekData = {
   yearWeek: string
   sumTea: number
   sumOther: number
 }
 
-// 月単位レスポンスの型
 type MonthData = {
   yearMonth: string
   sumTea: number
@@ -44,10 +57,13 @@ type MonthData = {
 
 export default function ThripsChart() {
   const [period, setPeriod] = useState<"day" | "week" | "month">("day")
+  const [chartType, setChartType] = useState<"line" | "pie">("line")
   const [dataList, setDataList] = useState<DayData[] | WeekData[] | MonthData[]>([])
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
+  const [loading, setLoading] = useState<boolean>(false)
 
-  // データ取得
   useEffect(() => {
+    setLoading(true)
     const fetchData = async () => {
       try {
         const res = await fetch(`/api/thrips?period=${period}`, { cache: "no-store" })
@@ -58,55 +74,58 @@ export default function ThripsChart() {
         setDataList(data)
       } catch (error) {
         console.error(error)
+      } finally {
+        setLoading(false)
       }
     }
     fetchData()
   }, [period])
 
-  // 期間セレクト
-  const handlePeriodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value as "day" | "week" | "month"
-    setPeriod(value)
-  }
+  useEffect(() => {
+    if(period === "month" && chartType === "pie" && !selectedMonth && dataList.length > 0) {
+      const monthData = dataList as MonthData[]
+      if(monthData.length > 0) {
+        setSelectedMonth(monthData[0].yearMonth)
+      }
+    }
+  }, [period, chartType, selectedMonth, dataList])
 
-  // CSVエクスポート用の関数
   const exportCSV = () => {
-    let csvContent = '';
-    let headers = '';
+    let csvContent = ''
+    let headers = ''
 
     if (period === "day") {
-      headers = 'date,sumTea,sumOther';
+      headers = 'date,sumTea,sumOther'
     } else if (period === "week") {
-      headers = 'yearWeek,sumTea,sumOther';
+      headers = 'yearWeek,sumTea,sumOther'
     } else {
-      headers = 'yearMonth,sumTea,sumOther';
+      headers = 'yearMonth,sumTea,sumOther'
     }
-    csvContent += headers + '\n';
+    csvContent += headers + '\n'
 
     dataList.forEach(item => {
       if (period === "day") {
-        const row = item as DayData;
-        csvContent += `${row.date},${row.sumTea},${row.sumOther}\n`;
+        const row = item as DayData
+        csvContent += `${row.date},${row.sumTea},${row.sumOther}\n`
       } else if (period === "week") {
-        const row = item as WeekData;
-        csvContent += `${row.yearWeek},${row.sumTea},${row.sumOther}\n`;
+        const row = item as WeekData
+        csvContent += `${row.yearWeek},${row.sumTea},${row.sumOther}\n`
       } else {
-        const row = item as MonthData;
-        csvContent += `${row.yearMonth},${row.sumTea},${row.sumOther}\n`;
+        const row = item as MonthData
+        csvContent += `${row.yearMonth},${row.sumTea},${row.sumOther}\n`
       }
-    });
+    })
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `thrips_${period}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.setAttribute("href", url)
+    link.setAttribute("download", `thrips_${period}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
 
-  // グラフ用データ生成
   let labels: string[] = []
   let teaValues: number[] = []
   let otherValues: number[] = []
@@ -114,29 +133,29 @@ export default function ThripsChart() {
   switch (period) {
     case "week": {
       const weekData = dataList as WeekData[]
-      labels = weekData.map((item) => item.yearWeek)
-      teaValues = weekData.map((item) => item.sumTea)
-      otherValues = weekData.map((item) => item.sumOther)
+      labels = weekData.map(item => item.yearWeek)
+      teaValues = weekData.map(item => item.sumTea)
+      otherValues = weekData.map(item => item.sumOther)
       break
     }
     case "month": {
       const monthData = dataList as MonthData[]
-      labels = monthData.map((item) => item.yearMonth)
-      teaValues = monthData.map((item) => item.sumTea)
-      otherValues = monthData.map((item) => item.sumOther)
+      labels = monthData.map(item => item.yearMonth)
+      teaValues = monthData.map(item => item.sumTea)
+      otherValues = monthData.map(item => item.sumOther)
       break
     }
     case "day":
     default: {
       const dayData = dataList as DayData[]
-      labels = dayData.map((item) => item.date)
-      teaValues = dayData.map((item) => item.sumTea)
-      otherValues = dayData.map((item) => item.sumOther)
+      labels = dayData.map(item => item.date)
+      teaValues = dayData.map(item => item.sumTea)
+      otherValues = dayData.map(item => item.sumOther)
       break
     }
   }
 
-  const data = {
+  const chartDataLine = {
     labels,
     datasets: [
       {
@@ -158,10 +177,41 @@ export default function ThripsChart() {
     ],
   }
 
-  // 縦軸の目盛りを見やすく設定するための計算
-  const allValues = [...teaValues, ...otherValues];
-  const maxY = allValues.length ? Math.max(...allValues) : 0;
-  const adjustedMax = Math.ceil(maxY / 10) * 10;  // 最大値を10の倍数に調整
+  const totalTea = teaValues.reduce((acc, val) => acc + val, 0)
+  const totalOther = otherValues.reduce((acc, val) => acc + val, 0)
+
+  let chartDataPie = {
+    labels: ["チャノキイロ", "別種"],
+    datasets: [
+      {
+        data: [totalTea, totalOther],
+        backgroundColor: ["rgba(75, 192, 192, 0.6)", "rgba(255, 99, 132, 0.6)"],
+        borderColor: ["rgba(75, 192, 192, 1)", "rgba(255, 99, 132, 1)"],
+        borderWidth: 1,
+      },
+    ],
+  }
+
+  if(chartType === "pie" && period === "month" && selectedMonth) {
+    const monthRecord = (dataList as MonthData[]).find(item => item.yearMonth === selectedMonth)
+    if(monthRecord) {
+      chartDataPie = {
+        labels: ["チャノキイロ", "別種"],
+        datasets: [
+          {
+            data: [monthRecord.sumTea, monthRecord.sumOther],
+            backgroundColor: ["rgba(75, 192, 192, 0.6)", "rgba(255, 99, 132, 0.6)"],
+            borderColor: ["rgba(75, 192, 192, 1)", "rgba(255, 99, 132, 1)"],
+            borderWidth: 1,
+          },
+        ],
+      }
+    }
+  }
+
+  const allValues = [...teaValues, ...otherValues]
+  const maxY = allValues.length ? Math.max(...allValues) : 0
+  const adjustedMax = Math.ceil(maxY / 10) * 10
 
   const options = {
     responsive: true,
@@ -170,59 +220,110 @@ export default function ThripsChart() {
       y: {
         beginAtZero: true,
         ticks: {
-          stepSize: 10,            // 10刻みで設定
-          max: adjustedMax,        // 調整した最大値
-          precision: 0,            // 整数表示を強制
+          stepSize: 10,
+          max: adjustedMax,
+          precision: 0,
           callback: function (tickValue: string | number) {
             if (typeof tickValue === "number") {
-              return tickValue.toString();
+              return tickValue.toString()
             }
-            return tickValue;
+            return tickValue
           },
         },
       },
     },
   }
 
+  const titleText = 
+    period === "day" ? "Daily" : 
+    period === "week" ? "Weekly" : "Monthly"
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800">
       <div className="max-w-3xl mx-auto px-4 py-10">
-        {/* タイトル */}
-        <h1 className="text-3xl font-bold text-center mb-8">
-          アザミウマ記録グラフ
-        </h1>
+        <h1 className="text-3xl font-bold text-center mb-8">Thrips Count</h1>
 
-        {/* 期間セレクタとCSVエクスポートボタン */}
-        <div className="flex justify-center items-center gap-4 mb-8">
-          <label
-            htmlFor="periodSelect"
-            className="text-base font-medium text-gray-700"
-          >
-            集計期間
-          </label>
-          <select
-            id="periodSelect"
-            value={period}
-            onChange={handlePeriodChange}
-            className="border border-gray-300 bg-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-          >
-            <option value="day">日</option>
-            <option value="week">週</option>
-            <option value="month">月</option>
-          </select>
-
-          <button
-            onClick={exportCSV}
-            className="ml-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none"
-          >
-            CSVエクスポート
-          </button>
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-8 space-y-4 md:space-y-0">
+          {chartType === "line" && (
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="periodSelect">期間</Label>
+              <Select 
+                value={period} 
+                onValueChange={(value) => setPeriod(value as "day" | "week" | "month")}
+              >
+                <SelectTrigger id="periodSelect" className="w-[150px]">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day">Daily</SelectItem>
+                  <SelectItem value="week">Weekly</SelectItem>
+                  <SelectItem value="month">Monthly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {chartType === "pie" && (
+            <div className="flex items-center justify-center space-x-2">
+              <Label htmlFor="monthSelect">Select Month</Label>
+              <Select 
+                value={selectedMonth ?? ""} 
+                onValueChange={(value) => setSelectedMonth(value)}
+              >
+                <SelectTrigger id="monthSelect" className="w-[150px]">
+                  <SelectValue placeholder="Select Month" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(dataList as MonthData[]).map(item => (
+                    <SelectItem key={item.yearMonth} value={item.yearMonth}>
+                      {item.yearMonth}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <div className="flex space-x-2">
+            <Button
+              variant={chartType === "line" ? "default" : "outline"}
+              onClick={() => {
+                setChartType("line")
+                setPeriod("day")
+              }}
+            >
+              折れ線
+            </Button>
+            <Button
+              variant={chartType === "pie" ? "default" : "outline"}
+              onClick={() => {
+                setChartType("pie")
+                setPeriod("month")
+              }}
+            >
+              円
+            </Button>
+          </div>
         </div>
 
-        {/* グラフをカード風に */}
-        <div className="bg-white shadow-sm rounded-lg p-6" style={{ height: '500px' }}>
-          <Line data={data} options={options} />
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-center">{titleText}</CardTitle>
+          </CardHeader>
+          <CardContent className="h-[500px] flex justify-center items-center">
+            {loading ? (
+              <Loader2 className="animate-spin h-8 w-8 text-gray-500" />
+            ) : chartType === "line" ? (
+              <Line data={chartDataLine} options={options} />
+            ) : (
+              <Pie data={chartDataPie} />
+            )}
+          </CardContent>
+        </Card>
+
+        {chartType === "line" && (
+          <div className="flex justify-center mt-4">
+            <Button onClick={exportCSV}>Export CSV</Button>
+          </div>
+        )}
       </div>
     </div>
   )
